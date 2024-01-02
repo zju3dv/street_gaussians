@@ -9,7 +9,7 @@
 ![pipeline](images/pipeline.jpg)
 
 ### Videos
-https://github.com/zju3dv/street_gaussians/assets/66961088/6b4eaab2-9251-42be-a186-6371e30a49bd
+https://github.com/zju3dv/street_gaussians/assets/66961088/f50fef47-0362-4563-958a-6e5729119138
 
 https://github.com/zju3dv/street_gaussians/assets/66961088/cf2d4ce0-205d-4826-a1b8-6927dec9448d
 
