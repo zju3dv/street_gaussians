@@ -1,0 +1,79 @@
+task: waymo_full_exp
+source_path: ./data/waymo/training/031
+exp_name: waymo_train_031
+
+data:
+  split_test: -1
+  split_train: 1
+  type: Waymo
+  white_background: false
+  selected_frames: [0, 198]
+  cameras: [0, 1, 2]
+  extent: 10
+  use_colmap: true
+  filter_colmap: true
+  box_scale: 1.5
+
+model:
+  gaussian:
+    sh_degree: 1
+    fourier_dim: 5
+    fourier_scale: 1.
+    flip_prob: 0.
+  nsg:
+    include_bkgd: true
+    include_obj: true
+    include_sky: true
+    opt_track: true
+
+train:
+  iterations: 50000
+  test_iterations: [7000, 30000, 50000]
+  save_iterations: [50000]
+  checkpoint_iterations: [50000]
+
+optim:
+  prune_box_interval: 100
+  densification_interval: 100
+  densify_from_iter: 500
+  densify_grad_threshold_bkgd: 0.0006
+  densify_grad_abs_bkgd: True
+  densify_grad_threshold_obj: 0.0002
+  densify_grad_abs_obj: False
+  densify_until_iter: 25000
+  feature_lr: 0.0025
+  max_screen_size: 20
+  min_opacity: 0.005
+  opacity_lr: 0.05
+  opacity_reset_interval: 3000
+  percent_big_ws: 0.1
+  percent_dense: 0.01
+  position_lr_delay_mult: 0.01
+  position_lr_final: 1.6e-06
+  position_lr_init: 0.00016
+  position_lr_max_steps: 50000
+  rotation_lr: 0.001
+  scaling_lr: 0.005
+  semantic_lr: 0.01
+
+  lambda_dssim: 0.2
+  lambda_sky: 0.05
+  lambda_mask: 0.1
+  lambda_reg: 0.1
+  lambda_depth_lidar: 0.1
+  lambda_color_correction: 0.1
+
+  track_position_lr_delay_mult: 0.01
+  track_position_lr_init: 0.005
+  track_position_lr_final: 5.0e-5
+  track_position_max_steps: 30000
+
+  track_rotation_lr_delay_mult: 0.01
+  track_rotation_lr_init: 0.001
+  track_rotation_lr_final: 1.0e-5
+  track_rotation_max_steps: 30000
+
+
+render:
+  fps: 24
+  concat_cameras: [1, 0, 2]
