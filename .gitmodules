@@ -1,9 +1,0 @@
-[submodule "submodules/simple-knn"]
-	path = submodules/simple-knn
-	url = https://gitlab.inria.fr/bkerbl/simple-knn.git
-# [submodule "SIBR_viewers"]
-# 	path = SIBR_viewers
-# 	url = https://gitlab.inria.fr/sibr/sibr_core
-[submodule "submodules/simple-waymo-open-dataset-reader"]
-	path = submodules/simple-waymo-open-dataset-reader
-	url = https://github.com/gdlg/simple-waymo-open-dataset-reader
