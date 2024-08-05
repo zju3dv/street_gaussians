@@ -6,6 +6,9 @@
 > Yunzhi Yan, Haotong Lin, Chenxu Zhou, Weijie Wang, Haiyang Sun, Kun Zhan, Xianpeng Lang, Xiaowei Zhou, Sida Peng  
 > ECCV 2024
 
+
+https://github.com/user-attachments/assets/f28a64bd-9932-4447-b710-9254ae5ed56f
+
 ### Installation
 <details> <summary>Clone this repository</summary>
 
