@@ -411,12 +411,12 @@ def parse_seq_rawdata(process_list, root_dir, seq_name, seq_save_dir, track_file
                         
                         # if one corner of the 3D bounding box is on camera plane, we should consider it as visible
                         # partial visible for the case when not all corners can be observed
-                    if valid.any():
-                        # print(f'At frame {frame_id}, label {label_id} is visible on {camera_names_dict[camera_name]}')
-                        bbox_visible_dict[label_id][frame_id].append(camera_name-1)
-                    if valid.all():
-                        vertices = vertices.reshape(2, 2, 2, 2).astype(np.int32)
-                        draw_3d_box_on_img(vertices, images[camera_name])
+                        if valid.any():
+                            # print(f'At frame {frame_id}, label {label_id} is visible on {camera_names_dict[camera_name]}')
+                            bbox_visible_dict[label_id][frame_id].append(camera_name-1)
+                        if valid.all():
+                            vertices = vertices.reshape(2, 2, 2, 2).astype(np.int32)
+                            draw_3d_box_on_img(vertices, images[camera_name])
                       
                     bbox_visible_dict[label_id][frame_id] = sorted(bbox_visible_dict[label_id][frame_id])
 
