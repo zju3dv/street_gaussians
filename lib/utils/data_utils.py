@@ -34,7 +34,6 @@ def get_split_data(split_train, split_test, data):
     return train_data, test_data
 
 def get_val_frames(num_frames: int, test_every: int, train_every: int):
-    assert train_every is None or test_every is None
     if train_every is None or train_every < 0:
         val_frames = set(np.arange(test_every, num_frames, test_every))
         train_frames = (set(np.arange(num_frames)) - val_frames) if test_every > 1 else set()

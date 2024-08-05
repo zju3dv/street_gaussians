@@ -1,9 +1,6 @@
 import os, sys
 
 sys.path.append(os.getcwd())
-# Change to your folder here
-sys.path.append('/home/yanyunzhi/code/Grounded-Segment-Anything')
-
 import argparse
 import os
 import copy
@@ -18,12 +15,12 @@ from termcolor import colored
 from glob import glob
 
 # Grounding DINO
-import GroundingDINO.groundingdino.datasets.transforms as T
-from GroundingDINO.groundingdino.models import build_model
-from GroundingDINO.groundingdino.util import box_ops
-from GroundingDINO.groundingdino.util.slconfig import SLConfig
-from GroundingDINO.groundingdino.util.utils import clean_state_dict, get_phrases_from_posmap
-from GroundingDINO.groundingdino.util.inference import annotate, load_image, predict
+import groundingdino.datasets.transforms as T
+from groundingdino.models import build_model
+from groundingdino.util import box_ops
+from groundingdino.util.slconfig import SLConfig
+from groundingdino.util.utils import clean_state_dict, get_phrases_from_posmap
+from groundingdino.util.inference import annotate, load_image, predict
 import supervision as sv
 
 # segment anything
@@ -32,7 +29,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-def setup():
+def setup(args):
     # ======================== Load Grounding DINO model ========================
     print(colored('Load Grounding DINO model', 'green'))
     def load_model_hf(repo_id, filename, ckpt_config_filename, device='cpu'):
@@ -59,8 +56,8 @@ def setup():
 
     # ======================== Load Segment Anything model ========================
     print(colored('Load SAM model', 'green'))
-    sam_checkpoint = '/nas/home/yanyunzhi/segment-anything/sam_vit_h_4b8939.pth.1'
-    sam = build_sam(checkpoint=sam_checkpoint)
+    # sam_checkpoint = '/nas/home/yanyunzhi/segment-anything/sam_vit_h_4b8939.pth.1'
+    sam = build_sam(checkpoint=args.sam_checkpoint)
     sam.cuda()
     global sam_predictor
     sam_predictor = SamPredictor(sam)
@@ -173,9 +170,10 @@ if __name__ == "__main__":
     parser.add_argument('--box_threshold', nargs='+', type=float, default=[0.3]) # Change this to your threshold
     parser.add_argument("--text_threshold", type=float, default=0.25)
     parser.add_argument("--ignore_exists", action='store_true')
-
+    parser.add_argument("--sam_checkpoint", type=str)
+    
     args = parser.parse_args()
-    setup()
+    setup(args)
 
     assert isinstance(args.box_threshold, list)
     if len(args.box_threshold) == 1:

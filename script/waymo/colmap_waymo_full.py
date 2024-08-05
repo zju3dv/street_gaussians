@@ -262,33 +262,34 @@ def run_colmap_waymo(result):
     triangulated_dir = os.path.join(colmap_dir, 'triangulated/sparse/model')
     os.makedirs(triangulated_dir, exist_ok=True)
     os.system(f'colmap point_triangulator \
-            --database_path {colmap_dir}/database.db \
-            --image_path {train_images_dir} \
-            --input_path {model_dir} \
-            --output_path {triangulated_dir} \
-            --Mapper.ba_refine_focal_length 0 \
-            --Mapper.ba_refine_principal_point 0 \
-            --Mapper.max_extra_param 0 \
-            --clear_points 0 \
-            --Mapper.ba_global_max_num_iterations 30 \
-            --Mapper.filter_max_reproj_error 4 \
-            --Mapper.filter_min_tri_angle 0.5 \
-            --Mapper.tri_min_angle 0.5 \
-            --Mapper.tri_ignore_two_view_tracks 1 \
-            --Mapper.tri_complete_max_reproj_error 4 \
-            --Mapper.tri_continue_max_angle_error 4')
-
-    # May lead to unstable results when refining relative poses
-    # os.system(f'colmap rig_bundle_adjuster \
-    #         --input_path {triangulated_dir} \
-    #         --output_path {triangulated_dir} \
-    #         --rig_config_path {rigid_config_path} \
-    #         --estimate_rig_relative_poses 0 \
-    #         --RigBundleAdjustment.refine_relative_poses 0 \
-    #         --BundleAdjustment.max_num_iterations 50 \
-    #         --BundleAdjustment.refine_focal_length 0 \
-    #         --BundleAdjustment.refine_principal_point 0 \
-    #         --BundleAdjustment.refine_extra_params 0')
+        --database_path {colmap_dir}/database.db \
+        --image_path {train_images_dir} \
+        --input_path {model_dir} \
+        --output_path {triangulated_dir} \
+        --Mapper.ba_refine_focal_length 0 \
+        --Mapper.ba_refine_principal_point 0 \
+        --Mapper.max_extra_param 0 \
+        --clear_points 0 \
+        --Mapper.ba_global_max_num_iterations 30 \
+        --Mapper.filter_max_reproj_error 4 \
+        --Mapper.filter_min_tri_angle 0.5 \
+        --Mapper.tri_min_angle 0.5 \
+        --Mapper.tri_ignore_two_view_tracks 1 \
+        --Mapper.tri_complete_max_reproj_error 4 \
+        --Mapper.tri_continue_max_angle_error 4')
+    
+    if cfg.data.use_colmap_pose:
+        # May lead to unstable results when refining relative poses
+        os.system(f'colmap rig_bundle_adjuster \
+                --input_path {triangulated_dir} \
+                --output_path {triangulated_dir} \
+                --rig_config_path {rigid_config_path} \
+                --estimate_rig_relative_poses 0 \
+                --RigBundleAdjustment.refine_relative_poses 1 \
+                --BundleAdjustment.max_num_iterations 50 \
+                --BundleAdjustment.refine_focal_length 0 \
+                --BundleAdjustment.refine_principal_point 0 \
+                --BundleAdjustment.refine_extra_params 0')
 
     os.system(f'rm -rf {train_images_dir}')
     os.system(f'rm -rf {test_images_dir}')  

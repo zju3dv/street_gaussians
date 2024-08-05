@@ -16,9 +16,9 @@ from lib.utils.box_utils import bbox_to_corner3d, get_bound_2d_mask
 from lib.utils.img_utils import draw_3d_box_on_img
 from lib.utils.graphics_utils import project_numpy
 
-castrack_path = '/nas/home/yanyunzhi/waymo/castrack/seq_infos/val/result.json'
-with open(castrack_path, 'r') as f:
-    castrack_infos = json.load(f)
+# castrack_path = '/nas/home/yanyunzhi/waymo/castrack/seq_infos/val/result.json'
+# with open(castrack_path, 'r') as f:
+#     castrack_infos = json.load(f)
 
 camera_names_dict = {
     dataset_pb2.CameraName.FRONT_LEFT: 'FRONT_LEFT', 
@@ -94,9 +94,15 @@ def project_label_to_mask(dim, obj_pose, calibration):
     return mask
     
     
-def parse_seq_rawdata(process_list, root_dir, seq_name, seq_save_dir, start_idx=None, end_idx=None):
+def parse_seq_rawdata(process_list, root_dir, seq_name, seq_save_dir, track_file, start_idx=None, end_idx=None):
     print(f'Processing sequence {seq_name}...')
     print(f'Saving to {seq_save_dir}')
+    
+    try:
+        with open(track_file, 'r') as f:
+            castrack_infos = json.load(f)
+    except:
+        castrack_infos = dict()
 
     os.makedirs(seq_save_dir, exist_ok=True)
     
@@ -170,6 +176,7 @@ def parse_seq_rawdata(process_list, root_dir, seq_name, seq_save_dir, start_idx=
         os.makedirs(image_save_dir, exist_ok=True)        
         print("Processing image data...")
         
+        datafile = WaymoDataFileReader(seq_path)
         for frame_id, frame in tqdm(enumerate(datafile)):
             for camera_name, camera_name_str in camera_names_dict.items():                    
                 camera = utils.get(frame.images, camera_name)
@@ -185,7 +192,6 @@ def parse_seq_rawdata(process_list, root_dir, seq_name, seq_save_dir, start_idx=
         print("Processing LiDAR data...")
                 
         datafile = WaymoDataFileReader(seq_path)
-
         for frame_id, frame in tqdm(enumerate(datafile)):
             pts_3d = [] # LiDAR point cloud in world frame
             pts_2d = [] # LiDAR point cloud projection in camera [camera_name, w, h] 
@@ -457,7 +463,8 @@ def parse_seq_rawdata(process_list, root_dir, seq_name, seq_save_dir, start_idx=
         print("Saving dynamic mask ...")
         dynamic_mask_dir = os.path.join(seq_save_dir, "dynamic_mask")
         os.makedirs(dynamic_mask_dir, exist_ok=True)
-        
+        datafile = WaymoDataFileReader(seq_path)
+
         for frame_id, frame in tqdm(enumerate(datafile)):
             masks = dict()
             for camera_name in camera_names_dict.keys():
@@ -520,17 +527,22 @@ def main():
     parser.add_argument('--process_list', type=str, nargs='+', default=['pose', 'calib', 'image', 'lidar', 'track', 'dynamic_mask'])
     parser.add_argument('--root_dir', type=str, default='/nas/home/yanyunzhi/waymo/training')
     parser.add_argument('--save_dir', type=str, default='/nas/home/yanyunzhi/waymo/street_gaussian/training/surrounding')
+    parser.add_argument('--track_file', type=str, default='/nas/home/yanyunzhi/waymo/castrack/seq_infos/val/result.json')
     parser.add_argument('--split_file', type=str)
+    parser.add_argument('--segment_file', type=str)
     args = parser.parse_args()
     
     process_list = args.process_list
     root_dir = args.root_dir
     save_dir = args.save_dir
+    track_file = args.track_file
     split_file = open(args.split_file, "r").readlines()[1:]
     scene_ids_list = [int(line.strip().split(",")[0]) for line in split_file]
     seq_names = [line.strip().split(",")[1] for line in split_file]
+    segment_file = args.segment_file
 
-    seq_lists = open(os.path.join(root_dir, 'segment_list.txt')).read().splitlines()
+    seq_lists = open(segment_file).read().splitlines()
+    # seq_lists = open(os.path.join(root_dir, 'segment_list.txt')).read().splitlines()
     os.makedirs(save_dir, exist_ok=True)
     for i, scene_id in enumerate(scene_ids_list):
         assert seq_names[i][3:] == seq_lists[scene_id][8:14]
@@ -540,9 +552,8 @@ def main():
             root_dir=root_dir,
             seq_name=seq_lists[scene_id],
             seq_save_dir=seq_save_dir,
+            track_file=track_file,
         )
     
-
-
 if __name__ == '__main__':
     main()

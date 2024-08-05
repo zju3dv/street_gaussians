@@ -61,7 +61,6 @@ optim:
   lambda_mask: 0.1
   lambda_reg: 0.1
   lambda_depth_lidar: 0.1
-  lambda_color_correction: 0.1
 
   track_position_lr_delay_mult: 0.01
   track_position_lr_init: 0.005
