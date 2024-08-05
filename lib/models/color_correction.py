@@ -71,10 +71,16 @@ class ColorCorrection(nn.Module):
         color_correction_lr_init = args.get('color_correction_lr_init', 5e-4)
         color_correction_lr_final = args.get('color_correction_lr_final', 5e-5)
         color_correction_max_steps = args.get('color_correction_max_steps', cfg.train.iterations)
-        params = [
-            {'params': list(self.affine_trans.parameters()), 'lr': color_correction_lr_init, 'name': 'affine_trans'},
-            {'params': list(self.affine_trans_sky.parameters()), 'lr': color_correction_lr_init, 'name': 'affine_trans_sky'},
-        ]
+        if self.config.use_mlp:
+            params = [
+                {'params': list(self.affine_trans.parameters()), 'lr': color_correction_lr_init, 'name': 'affine_trans'},
+                {'params': list(self.affine_trans_sky.parameters()), 'lr': color_correction_lr_init, 'name': 'affine_trans_sky'},
+            ]
+        else:
+            params = [
+                {'params': [self.affine_trans], 'lr': color_correction_lr_init, 'name': 'affine_trans'},
+                {'params': [self.affine_trans_sky], 'lr': color_correction_lr_init, 'name': 'affine_trans_sky'},
+            ]
         self.optimizer = torch.optim.Adam(params=params, lr=0, eps=1e-15)
 
         self.color_correction_scheduler_args = get_expon_lr_func(
