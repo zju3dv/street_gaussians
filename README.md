@@ -47,7 +47,7 @@ We provide the split file following [EmerNeRF](https://emernerf.github.io/https:
 <!-- Please note that `val_dynamic.txt` specify scenes from the validation set, which means you may need to change the file source [here](https://github.com/NVlabs/EmerNeRF/blob/8c051d7cccbad3b52c7b11a519c971b8ead97e1a/datasets/download_waymo.py#L31). -->
 
 #### Preprocess the data
-Download the tracking predictions on validation set, We provide the processed results [here](https://drive.google.com/file/d/1bMDOMtZdyP3m8qY1Phb5Sr6Po-QWFIWk/view?usp=drive_link)
+Download the tracking predictions on validation set, We provide the processed results [here](https://drive.google.com/file/d/1bMDOMtZdyP3m8qY1Phb5Sr6Po-QWFIWk/view?usp=drive_link).
 
 
 Preprocess the example scenes
@@ -68,10 +68,10 @@ python script/waymo/generate_lidar_depth.py --datadir DATA_DIR
 
 Generating sky mask
 
-Install [GroundingDINO](https://github.com/IDEA-Research/GroundingDINO) following this repo and download SAM checkpoint from [this link](https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth).
+Install GroundingDINO following [this repo](https://github.com/IDEA-Research/GroundingDINO) and download SAM checkpoint from [this link](https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth).
 
 ```
-python script/waymo/generate_sky_mask.py --datadir data/waymo/training/001 --sam_checkpoint SAM_CKPT
+python script/waymo/generate_sky_mask.py --datadir DATA_DIR --sam_checkpoint SAM_CKPT
 ```
 
 
