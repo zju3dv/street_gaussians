@@ -6,7 +6,7 @@ lpips
 plyfile
 tensorboard
 sympy
-numpy
+numpy==1.23.5
 pillow
 matplotlib
 bidict
