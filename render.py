@@ -9,7 +9,7 @@ from lib.models.scene import Scene
 from lib.utils.general_utils import safe_state
 from lib.config import cfg
 from lib.visualizers.base_visualizer import BaseVisualizer as Visualizer
-from lib.visualizers.street_gaussian_visualizer import StreetGaussianisualizer
+from lib.visualizers.street_gaussian_visualizer import StreetGaussianVisualizer
 import time
 
 def render_sets():
@@ -71,7 +71,7 @@ def render_trajectory():
         renderer = StreetGaussianRenderer()
         
         save_dir = os.path.join(cfg.model_path, 'trajectory', "ours_{}".format(scene.loaded_iter))
-        visualizer = StreetGaussianisualizer(save_dir)
+        visualizer = StreetGaussianVisualizer(save_dir)
         
         train_cameras = scene.getTrainCameras()
         test_cameras = scene.getTestCameras()
