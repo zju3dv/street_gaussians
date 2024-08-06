@@ -9,11 +9,9 @@ from lib.utils.camera_utils import Camera
 from lib.utils.img_utils import visualize_depth_numpy
 from lib.config import cfg
 
-class StreetGaussianisualizer():
+class StreetGaussianVisualizer():
     def __init__(self, save_dir):
         
-        if cfg.render.edit:
-            save_dir = save_dir + '_edit'
         self.result_dir = save_dir
         os.makedirs(self.result_dir, exist_ok=True)
         
