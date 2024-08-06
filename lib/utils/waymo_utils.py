@@ -697,8 +697,8 @@ def generate_dataparser_outputs(
         #     pass
 
 
-        result['points_xyz_dict'] = points_xyz_dict
-        result['points_rgb_dict'] = points_rgb_dict
+        # result['points_xyz_dict'] = points_xyz_dict
+        # result['points_rgb_dict'] = points_rgb_dict
 
         for k in points_xyz_dict.keys():
             points_xyz = points_xyz_dict[k]
