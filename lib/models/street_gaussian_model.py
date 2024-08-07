@@ -53,6 +53,12 @@ class StreetGaussianModel(nn.Module):
         # camera pose optimizations (not test)
         self.use_pose_correction = cfg.model.use_pose_correction
     
+        # symmetry
+        self.flip_prob = cfg.model.gaussian.get('flip_prob', 0.)
+        self.flip_axis = 1 
+        self.flip_matrix = torch.eye(3).float().cuda() * -1
+        self.flip_matrix[self.flip_axis, self.flip_axis] = 1
+        self.flip_matrix = matrix_to_quaternion(self.flip_matrix.unsqueeze(0))
         self.setup_functions() 
     
     def set_visibility(self, include_list):
@@ -239,7 +245,7 @@ class StreetGaussianModel(nn.Module):
                     self.graph_obj_list.append(obj_name)
                     num_gaussians_obj = getattr(self, obj_name).get_xyz.shape[0]
                     self.num_gaussians += num_gaussians_obj
-        
+
         # set index range
         self.graph_gaussian_range = dict()
         idx = 0
@@ -254,6 +260,38 @@ class StreetGaussianModel(nn.Module):
             self.graph_gaussian_range[obj_name] = [idx, idx+num_gaussians_obj-1]
             idx += num_gaussians_obj
 
+        if len(self.graph_obj_list) > 0:
+            self.obj_rots = []
+            self.obj_trans = []
+            for i, obj_name in enumerate(self.graph_obj_list):
+                obj_model: GaussianModelActor = getattr(self, obj_name)
+                track_id = obj_model.track_id
+                obj_rot = self.actor_pose.get_tracking_rotation(track_id, self.viewpoint_camera)
+                obj_trans = self.actor_pose.get_tracking_translation(track_id, self.viewpoint_camera)                
+                ego_pose = self.viewpoint_camera.ego_pose
+                ego_pose_rot = matrix_to_quaternion(ego_pose[:3, :3].unsqueeze(0)).squeeze(0)
+                obj_rot = quaternion_raw_multiply(ego_pose_rot.unsqueeze(0), obj_rot.unsqueeze(0)).squeeze(0)
+                obj_trans = ego_pose[:3, :3] @ obj_trans + ego_pose[:3, 3]
+                
+                obj_rot = obj_rot.expand(obj_model.get_xyz.shape[0], -1)
+                obj_trans = obj_trans.unsqueeze(0).expand(obj_model.get_xyz.shape[0], -1)
+                
+                self.obj_rots.append(obj_rot)
+                self.obj_trans.append(obj_trans)
+            
+            self.obj_rots = torch.cat(self.obj_rots, dim=0)
+            self.obj_trans = torch.cat(self.obj_trans, dim=0)  
+            
+            self.flip_mask = []
+            for obj_name in self.graph_obj_list:
+                obj_model: GaussianModelActor = getattr(self, obj_name)
+                if obj_model.deformable or self.flip_prob == 0:
+                    flip_mask = torch.zeros_like(obj_model.get_xyz[:, 0]).bool()
+                else:
+                    flip_mask = torch.rand_like(obj_model.get_xyz[:, 0]) < self.flip_prob
+                self.flip_mask.append(flip_mask)
+            self.flip_mask = torch.cat(self.flip_mask, dim=0)   
+            
     @property
     def get_scaling(self):
         scalings = []
@@ -278,28 +316,24 @@ class StreetGaussianModel(nn.Module):
 
         if self.get_visibility('background'):            
             rotations_bkgd = self.background.get_rotation
-            
             if self.use_pose_correction:
-                rotations_bkgd = self.pose_correction.correct_gaussian_rotation(self.viewpoint_camera, rotations_bkgd)
-            
+                rotations_bkgd = self.pose_correction.correct_gaussian_rotation(self.viewpoint_camera, rotations_bkgd)            
             rotations.append(rotations_bkgd)
-        
-        for i, obj_name in enumerate(self.graph_obj_list):
-            obj_model: GaussianModelActor = getattr(self, obj_name)
-            track_id = obj_model.track_id
-            rotations_local = obj_model.get_rotation
-            rotations_local = obj_model.flip_rotation(rotations_local)
-            
-            obj_rot = self.actor_pose.get_tracking_rotation(track_id, self.viewpoint_camera)
-            if cfg.render.coord == 'world':
-                ego_pose = self.viewpoint_camera.ego_pose
-                ego_pose_rot = matrix_to_quaternion(ego_pose[:3, :3].unsqueeze(0)).squeeze(0)
-                obj_rot = quaternion_raw_multiply(ego_pose_rot.unsqueeze(0), obj_rot.unsqueeze(0)).squeeze(0)
-        
-            rotations_global = quaternion_raw_multiply(obj_rot[None], rotations_local) # [N, 4]
-            rotations_global = torch.nn.functional.normalize(rotations_global)
-            rotations.append(rotations_global)
-                
+
+        if len(self.graph_obj_list) > 0:
+            rotations_local = []
+            for i, obj_name in enumerate(self.graph_obj_list):
+                obj_model: GaussianModelActor = getattr(self, obj_name)
+                rotation_local = obj_model.get_rotation
+                rotations_local.append(rotation_local)
+
+            rotations_local = torch.cat(rotations_local, dim=0)
+            rotations_local = rotations_local.clone()
+            rotations_local[self.flip_mask] = quaternion_raw_multiply(self.flip_matrix, rotations_local[self.flip_mask])
+            rotations_obj = quaternion_raw_multiply(self.obj_rots, rotations_local)
+            rotations_obj = torch.nn.functional.normalize(rotations_obj)
+            rotations.append(rotations_obj)
+
         rotations = torch.cat(rotations, dim=0)
         return rotations
     
@@ -307,32 +341,26 @@ class StreetGaussianModel(nn.Module):
     def get_xyz(self):
         xyzs = []
         if self.get_visibility('background'):
-            xyzs_bkgd = self.background.get_xyz
-            
+            xyz_bkgd = self.background.get_xyz
             if self.use_pose_correction:
-                xyzs_bkgd = self.pose_correction.correct_gaussian_xyz(self.viewpoint_camera, xyzs_bkgd)
-
-            xyzs.append(xyzs_bkgd)
-                
-        for i, obj_name in enumerate(self.graph_obj_list):
-            obj_model: GaussianModelActor = getattr(self, obj_name)
-            track_id = obj_model.track_id
-
-            xyzs_local = obj_model.get_xyz
-            xyzs_local = obj_model.flip_xyz(xyzs_local)
+                xyz_bkgd = self.pose_correction.correct_gaussian_xyz(self.viewpoint_camera, xyz_bkgd)
             
-            obj_rot = self.actor_pose.get_tracking_rotation(track_id, self.viewpoint_camera)
-            obj_trans = self.actor_pose.get_tracking_translation(track_id, self.viewpoint_camera)
-            if cfg.render.coord == 'world':
-                ego_pose = self.viewpoint_camera.ego_pose
-                ego_pose_rot = matrix_to_quaternion(ego_pose[:3, :3].unsqueeze(0)).squeeze(0)
-                obj_rot = quaternion_raw_multiply(ego_pose_rot.unsqueeze(0), obj_rot.unsqueeze(0)).squeeze(0)
-                obj_trans = ego_pose[:3, :3] @ obj_trans + ego_pose[:3, 3]
-            
-            obj_rot = quaternion_to_matrix(obj_rot.unsqueeze(0)).squeeze(0)
-            xyzs_global = xyzs_local @ obj_rot.transpose(0, 1) + obj_trans
+            xyzs.append(xyz_bkgd)
+        
+        if len(self.graph_obj_list) > 0:
+            xyzs_local = []
+
+            for i, obj_name in enumerate(self.graph_obj_list):
+                obj_model: GaussianModelActor = getattr(self, obj_name)
+                xyz_local = obj_model.get_xyz
+                xyzs_local.append(xyz_local)
                 
-            xyzs.append(xyzs_global)
+            xyzs_local = torch.cat(xyzs_local, dim=0)
+            xyzs_local = xyzs_local.clone()
+            xyzs_local[self.flip_mask, self.flip_axis] *= -1
+            obj_rots = quaternion_to_matrix(self.obj_rots)
+            xyzs_obj = torch.einsum('bij, bj -> bi', obj_rots, xyzs_local) + self.obj_trans
+            xyzs.append(xyzs_obj)
 
         xyzs = torch.cat(xyzs, dim=0)
 
@@ -438,7 +466,7 @@ class StreetGaussianModel(nn.Module):
         if self.get_visibility('background'):
             normals_bkgd = self.background.get_normals(camera)            
             normals.append(normals_bkgd)
-
+            
         for i, obj_name in enumerate(self.graph_obj_list):
             obj_model: GaussianModelActor = getattr(self, obj_name)
             track_id = obj_model.track_id
@@ -566,18 +594,12 @@ class StreetGaussianModel(nn.Module):
     
     def get_box_reg_loss(self):
         box_reg_loss = 0.
-    
         for obj_name in self.obj_list:
             obj_model: GaussianModelActor = getattr(self, obj_name)
             box_reg_loss += obj_model.box_reg_loss()
         box_reg_loss /= len(self.obj_list)
 
         return box_reg_loss
-    
-    def set_flip(self, flip=None):
-        for obj_name in self.obj_list:
-            obj_model: GaussianModelActor = getattr(self, obj_name)
-            obj_model.set_flip(flip)
             
     def reset_opacity(self, exclude_list=[]):
         for model_name in self.model_name_id.keys():

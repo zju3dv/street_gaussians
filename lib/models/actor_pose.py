@@ -155,8 +155,8 @@ class ActorPose(nn.Module):
             rots2 = quaternion_raw_multiply(rots2.unsqueeze(0), opt_rots2.unsqueeze(0)).squeeze(0)
 
         else:
-            rots1 = self.input_rots[ind1]
-            rots2 = self.input_rots[ind2]
+            rots1 = self.input_rots[frame_ind1, column_ind1]
+            rots2 = self.input_rots[frame_ind2, column_ind2]
 
         r = (timestamp - timestamp1) / (timestamp2 - timestamp1)
         rots = quaternion_slerp(rots1, rots2, r)

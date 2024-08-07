@@ -1,7 +1,5 @@
 import os
 import torch
-import cv2
-import kornia
 from random import randint
 from lib.utils.loss_utils import l1_loss, l2_loss, psnr, ssim
 from lib.utils.img_utils import save_img_torch, visualize_depth_numpy
@@ -16,14 +14,12 @@ from lib.config import cfg
 from tqdm import tqdm
 from argparse import ArgumentParser, Namespace
 from lib.utils.system_utils import searchForMaxIteration
-
-
+import time
 try:
     from torch.utils.tensorboard import SummaryWriter
     TENSORBOARD_FOUND = True
 except ImportError:
     TENSORBOARD_FOUND = False
-
 
 def training():
     training_args = cfg.train
@@ -79,14 +75,21 @@ def training():
         #     if resolution_scales:  
         #         scale = resolution_scales.pop()
 
-        # if iteration >= cfg.optim.densify_from_iter and iteration <= cfg.optim.densify_until_iter:
-        gaussians.set_flip() 
 
         # Pick a random Camera
         if not viewpoint_stack:
-            viewpoint_stack = scene.getTrainCameras().copy()
+            if cfg.train.importance_sampling and iteration >= cfg.optim.densify_from_iter and iteration <= cfg.optim.densify_until_iter:
+                viewpoint_stack = scene.getTrainCamerasWithImportance(psnr_dict).copy()
+            else:
+                viewpoint_stack = scene.getTrainCameras().copy()
         
         viewpoint_cam: Camera = viewpoint_stack.pop(randint(0, len(viewpoint_stack) - 1))
+    
+        # ====================================================================
+        # Get mask
+        # original_mask: pixel in original_mask with 0 will not be surpervised
+        # original_acc_mask: use to suepervise the acc result of rendering
+        # original_sky_mask: sky mask
 
         gt_image = viewpoint_cam.original_image.cuda()
         if hasattr(viewpoint_cam, 'original_mask'):
@@ -106,11 +109,11 @@ def training():
         
         if (iteration - 1) == training_args.debug_from:
             cfg.render.debug = True
-
+            
         render_pkg = gaussians_renderer.render(viewpoint_cam, gaussians)
         image, acc, viewspace_point_tensor, visibility_filter, radii = render_pkg["rgb"], render_pkg['acc'], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         depth = render_pkg['depth'] # [1, H, W]
-                  
+
         scalar_dict = dict()
         # rgb loss
         Ll1 = l1_loss(image, gt_image, mask)

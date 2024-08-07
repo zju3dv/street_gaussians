@@ -47,11 +47,7 @@ class GaussianModelActor(GaussianModel):
         
         self.flip_prob = cfg.model.gaussian.get('flip_prob', 0.) if not self.deformable else 0.
         self.flip_axis = 1 
-        self.flip = False
-        self.flip_matrix = torch.eye(3).float().cuda()
-        self.flip_matrix[self.flip_axis, self.flip_axis] = -1
-        self.flip_matrix = matrix_to_quaternion(self.flip_matrix.unsqueeze(0))
-        
+
         self.spatial_lr_scale = extent
 
     def get_extent(self):
@@ -64,24 +60,6 @@ class GaussianModelActor(GaussianModel):
         print(f'extent: {extent.item()}, extent bound: [{extent_lower_bound}, {extent_upper_bound}]')
 
         return extent
-    
-    def set_flip(self, flip=None):
-        assert cfg.mode == 'train'
-        self.flip = flip or np.random.rand() < self.flip_prob
-    
-    def flip_xyz(self, xyz):
-        if self.flip:
-            xyz_flip = xyz.clone()
-            xyz_flip[:, self.flip_axis] *= -1
-            return xyz_flip
-        return xyz
-        
-    def flip_rotation(self, rotation):
-        if self.flip:
-            rotation_flip = quaternion_raw_multiply(self.flip_matrix, rotation)
-            return rotation_flip
-        return rotation
-        
     @property
     def get_semantic(self):
         semantic = torch.zeros((self.get_xyz.shape[0], self.num_classes_global)).float().cuda()
@@ -101,11 +79,8 @@ class GaussianModelActor(GaussianModel):
         features_dc = torch.sum(features_dc * idft_base[..., None], dim=1, keepdim=True) # [N, 1, 3]
         features_rest = self._features_rest # [N, sh, 3]
         features = torch.cat([features_dc, features_rest], dim=1) # [N, (sh + 1) * C, 3]
-        
-                        
         return features
            
-        
     def create_from_pcd(self, spatial_lr_scale):
         pointcloud_path = os.path.join(cfg.model_path, 'input_ply', f'points3D_{self.model_name}.ply')   
         if os.path.exists(pointcloud_path):
@@ -239,9 +214,9 @@ class GaussianModelActor(GaussianModel):
             grads = self.xyz_gradient_accum[:, 0:1] / self.denom
         
         grads[grads.isnan()] = 0.0
-        # print('=' * 20)
-        # print(f'Model name: {self.model_name}')
-        # print(f'Number of 3d gaussians: {self.get_xyz.shape[0]}')
+        print('=' * 20)
+        print(f'Model name: {self.model_name}')
+        print(f'Number of 3d gaussians: {self.get_xyz.shape[0]}')
 
         # Clone and Split
         # extent = self.get_extent()
@@ -251,7 +226,7 @@ class GaussianModelActor(GaussianModel):
 
         # Prune points below opacity
         prune_mask = (self.get_opacity < min_opacity).squeeze()
-        # print(f'Prune points below min_opactiy: {prune_mask.sum()}')
+        print(f'Prune points below min_opactiy: {prune_mask.sum()}')
         
         if prune_big_points:
             # Prune big points in world space
@@ -280,10 +255,10 @@ class GaussianModelActor(GaussianModel):
             prune_mask = torch.logical_or(prune_mask, big_points_ws)
             prune_mask = torch.logical_or(prune_mask, points_outside_box)
             
-        #     print(f'Prune points outside bbox: {points_outside_box.sum()}')
-        #     print(f'Prune big points in world space: {big_points_ws.sum()}')
+            print(f'Prune points outside bbox: {points_outside_box.sum()}')
+            print(f'Prune big points in world space: {big_points_ws.sum()}')
         
-        # print(f'Prune mask: {prune_mask.sum()}')
+        print(f'Prune mask: {prune_mask.sum()}')
         self.prune_points(prune_mask)
         
         # Reset
