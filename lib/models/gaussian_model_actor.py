@@ -214,9 +214,6 @@ class GaussianModelActor(GaussianModel):
             grads = self.xyz_gradient_accum[:, 0:1] / self.denom
         
         grads[grads.isnan()] = 0.0
-        print('=' * 20)
-        print(f'Model name: {self.model_name}')
-        print(f'Number of 3d gaussians: {self.get_xyz.shape[0]}')
 
         # Clone and Split
         # extent = self.get_extent()
@@ -226,7 +223,6 @@ class GaussianModelActor(GaussianModel):
 
         # Prune points below opacity
         prune_mask = (self.get_opacity < min_opacity).squeeze()
-        print(f'Prune points below min_opactiy: {prune_mask.sum()}')
         
         if prune_big_points:
             # Prune big points in world space
@@ -255,10 +251,6 @@ class GaussianModelActor(GaussianModel):
             prune_mask = torch.logical_or(prune_mask, big_points_ws)
             prune_mask = torch.logical_or(prune_mask, points_outside_box)
             
-            print(f'Prune points outside bbox: {points_outside_box.sum()}')
-            print(f'Prune big points in world space: {big_points_ws.sum()}')
-        
-        print(f'Prune mask: {prune_mask.sum()}')
         self.prune_points(prune_mask)
         
         # Reset

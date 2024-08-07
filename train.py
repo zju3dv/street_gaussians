@@ -78,10 +78,7 @@ def training():
 
         # Pick a random Camera
         if not viewpoint_stack:
-            if cfg.train.importance_sampling and iteration >= cfg.optim.densify_from_iter and iteration <= cfg.optim.densify_until_iter:
-                viewpoint_stack = scene.getTrainCamerasWithImportance(psnr_dict).copy()
-            else:
-                viewpoint_stack = scene.getTrainCameras().copy()
+            viewpoint_stack = scene.getTrainCameras().copy()
         
         viewpoint_cam: Camera = viewpoint_stack.pop(randint(0, len(viewpoint_stack) - 1))
     
