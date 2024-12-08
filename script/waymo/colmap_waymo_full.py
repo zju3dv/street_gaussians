@@ -28,7 +28,7 @@ def run_colmap_waymo(result):
     data_path = cfg.source_path
     colmap_dir = os.path.join(model_path, 'colmap')
     os.makedirs(colmap_dir, exist_ok=True)
-    print('runing colmap, colmap dir: ', colmap_dir)
+    print('running colmap, colmap dir: ', colmap_dir)
 
     unique_cams = sorted(list(set(result['cams'])))
     print('cameras: ', unique_cams)
