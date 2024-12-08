@@ -19,7 +19,7 @@ torchmetrics
 kornia
 roma
 imgviz
-protobuf==3.19.
+protobuf==3.19
 termcolor
 segment_anything
 git+https://github.com/NVlabs/nvdiffrast.git
