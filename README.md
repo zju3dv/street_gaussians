@@ -28,7 +28,7 @@ conda activate street-gaussian
 pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu116
 
 # Install requirements
-pip install -r requirments.txt
+pip install -r requirements.txt
 
 # Install submodules
 pip install ./submodules/diff-gaussian-rasterization
