@@ -22,11 +22,11 @@ class Scene:
             print("Creating gaussian model from point cloud")
             self.gaussians.create_from_pcd(point_cloud, scene_raidus)
             
-            train_cameras = self.getTrainCameras()
-            self.train_cameras_id_to_index = dict()
-            for i, train_camera in enumerate(train_cameras):
-                self.train_cameras_id_to_index[train_camera.id] = i
-            
+            if cfg.get('to_cuda', False):
+                print('Moving training cameras to GPU')
+                for camera in self.getTrainCameras():
+                    camera.set_device('cuda')
+                    
         else:
             # First check if there is a point cloud saved and get the iteration to load from
             assert(os.path.exists(cfg.point_cloud_dir))
@@ -34,12 +34,6 @@ class Scene:
                 self.loaded_iter = searchForMaxIteration(cfg.point_cloud_dir)
             else:
                 self.loaded_iter = cfg.loaded_iter
-
-            # Load pointcloud
-            # print("Loading saved pointcloud at iteration {}".format(self.loaded_iter))
-            # point_cloud_path = os.path.join(cfg.point_cloud_dir, f"iteration_{str(self.loaded_iter)}/point_cloud.ply")
-            
-            # self.gaussians.load_ply(point_cloud_path)
             
             # Load checkpoint if it exists (this loads other parameters like the optimized tracking poses)
             print("Loading checkpoint at iteration {}".format(self.loaded_iter))
@@ -59,7 +53,4 @@ class Scene:
         return self.dataset.test_cameras[scale]
     
     def getNovelViewCameras(self, scale=1):
-        try:
-            return self.dataset.novel_view_cameras[scale]
-        except:
-            return []
+        return self.dataset.novel_view_cameras[scale]

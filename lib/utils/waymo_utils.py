@@ -295,8 +295,6 @@ def generate_dataparser_outputs(
         cameras=[0, 1, 2, 3, 4]
     ):
     
-
-    
     image_dir = os.path.join(datadir, 'images')
     image_filenames_all = sorted(glob(os.path.join(image_dir, '*.png')))
     num_frames_all = len(image_filenames_all) // 5

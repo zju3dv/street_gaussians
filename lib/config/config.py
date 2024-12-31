@@ -18,6 +18,7 @@ cfg.exp_name = 'test' # experiment folder name
 cfg.gpus = [0] # list of gpus to use 
 cfg.debug = False
 cfg.resume = True # If set to True, resume training from the last checkpoint.
+cfg.to_cuda = False # higher GPU utilization with larger memory required
 
 cfg.source_path = ''
 cfg.model_path = ''

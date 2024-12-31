@@ -38,27 +38,11 @@ def readWaymoFullInfo(path, images='images', split_train=-1, split_test=-1, **kw
 
     # sky mask
     sky_mask_dir = os.path.join(path, 'sky_mask')
-    if not os.path.exists(sky_mask_dir):
-        cmd = f'python script/waymo/generate_sky_mask.py --datadir {path}'
-        print('Generating sky mask')
-        os.system(cmd)
-    load_sky_mask = (cfg.mode == 'train')
+    load_sky_mask = (cfg.mode == 'train') and os.path.exists(sky_mask_dir)
     
     # lidar depth
     lidar_depth_dir = os.path.join(path, 'lidar_depth')
-    if not os.path.exists(lidar_depth_dir):
-        cmd = f'python script/waymo/generate_lidar_depth.py --datadir {path}'
-        print('Generating lidar depth')
-        os.system(cmd)
-    load_lidar_depth = (cfg.mode == 'train')
-    
-    # Optional: monocular normal cue
-    mono_normal_dir = os.path.join(path, 'mono_normal')
-    load_mono_normal = cfg.data.use_mono_normal and (cfg.mode == 'train') and os.path.exists(mono_normal_dir)
-        
-    # Optional: monocular depth cue
-    mono_depth_dir = os.path.join(path, 'mono_depth')
-    load_mono_depth = cfg.data.use_mono_depth and (cfg.mode == 'train') and os.path.exists(mono_depth_dir)
+    load_lidar_depth = (cfg.mode == 'train') and os.path.exists(lidar_depth_dir)
 
     output = generate_dataparser_outputs(
         datadir=path, 
@@ -117,10 +101,6 @@ def readWaymoFullInfo(path, images='images', split_train=-1, split_test=-1, **kw
         FovY = focal2fov(fx, height)
         FovX = focal2fov(fy, width)    
         
-        # if cfg.render.coord == 'world':
-        #     RT = np.linalg.inv(c2w)        # render in world space
-        # else:
-        #     RT = np.linalg.inv(ext)        # render in vehicle space
         RT = np.linalg.inv(c2w)
         R = RT[:3, :3].T
         T = RT[:3, 3]
@@ -141,53 +121,40 @@ def readWaymoFullInfo(path, images='images', split_train=-1, split_test=-1, **kw
             metadata['is_val'] = True
             camera_timestamps[cams[i]]['test_timestamps'].append(cams_timestamps[i])
         
+        guidance = dict()
+
         # load dynamic mask
         if load_dynamic_mask:
             # dynamic_mask_path = os.path.join(dynamic_mask_dir, f'{image_name}.png')
             # obj_bound = (cv2.imread(dynamic_mask_path)[..., 0]) > 0.
             # obj_bound = Image.fromarray(obj_bound)
-            metadata['obj_bound'] = Image.fromarray(obj_bounds[i])
-                    
+            guidance['obj_bound'] = Image.fromarray(obj_bounds[i])
+
         # load lidar depth
         if load_lidar_depth:
-            depth_path = os.path.join(path, 'lidar_depth', f'{image_name}.npy')
-            
+            depth_path = os.path.join(lidar_depth_dir, f'{image_name}.npy')
             depth = np.load(depth_path, allow_pickle=True)
-            if isinstance(depth, np.ndarray):
-                depth = dict(depth.item())
-                mask = depth['mask']
-                value = depth['value']
-                depth = np.zeros_like(mask).astype(np.float32)
-                depth[mask] = value
-            
-            metadata['lidar_depth'] = depth
+            depth = dict(depth.item())
+            mask = depth['mask']
+            value = depth['value']
+            depth = np.zeros_like(mask).astype(np.float32)
+            depth[mask] = value
+            guidance['lidar_depth'] = depth
             
         # load sky mask
         if load_sky_mask:
             sky_mask_path = os.path.join(sky_mask_dir, f'{image_name}.png')
             sky_mask = (cv2.imread(sky_mask_path)[..., 0]) > 0.
-            sky_mask = Image.fromarray(sky_mask)
-            metadata['sky_mask'] = sky_mask
+            guidance['sky_mask'] = Image.fromarray(sky_mask)
         
-        # Optional: load monocular normal
-        if load_mono_normal:
-            mono_normal_path = os.path.join(mono_normal_dir, f'{image_name}.npy')
-            mono_normal = np.load(mono_normal_path)
-            metadata['mono_normal'] = mono_normal
-
-        # Optional load midas depth
-        if load_mono_depth:
-            mono_depth_path = os.path.join(mono_depth_dir, f'{image_name}.npy')
-            mono_depth = np.load(mono_depth_path)
-            metadata['mono_depth'] = mono_depth
-
         mask = None        
         cam_info = CameraInfo(
             uid=i, R=R, T=T, FovY=FovY, FovX=FovX, K=K,
             image=image, image_path=image_path, image_name=image_name,
-            width=width, height=height, 
-            mask=mask,
-            metadata=metadata)
+            width=width, height=height,
+            metadata=metadata,
+            guidance=guidance,
+        )
         cam_infos.append(cam_info)
         
         # sys.stdout.write('\n')

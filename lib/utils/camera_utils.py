@@ -25,7 +25,7 @@ class Camera(nn.Module):
         trans = np.array([0.0, 0.0, 0.0]), 
         scale = 1.0,
         metadata = dict(),
-        masks = dict(),
+        guidance=dict(),
     ):
         super(Camera, self).__init__()
 
@@ -38,11 +38,13 @@ class Camera(nn.Module):
         self.image_name = image_name
         self.trans, self.scale = trans, scale
 
-        # meta and mask
+        # metadata
         self.meta = metadata
-        for name, mask in masks.items():
-            setattr(self, name, mask)
-        
+
+        # guidance
+        self.guidance = guidance
+        self.original_image = image.clamp(0., 1.)
+
         self.original_image = image.clamp(0, 1)                
         self.image_height, self.image_width = self.original_image.shape[1], self.original_image.shape[2]
         self.zfar = 1000.0
@@ -95,7 +97,12 @@ class Camera(nn.Module):
     def get_intrinsic(self):
         ixt = self.K.cpu().numpy()
         return ixt
-    
+
+    def set_device(self, device):
+        self.original_image = self.original_image.to(device)
+        for k, v in self.guidance.items():
+            self.guidance[k] = v.to(device, non_blocking=True)
+
         
 class MiniCam:
     def __init__(self, width, height, fovy, fovx, znear, zfar, world_view_transform, full_proj_transform):
@@ -110,101 +117,49 @@ class MiniCam:
         view_inv = torch.inverse(self.world_view_transform)
         self.camera_center = view_inv[3][:3]
 
-def loadmask(cam_info: CameraInfo, resolution, resize_mode):
-    masks = dict()
-    if cfg.data.type == 'Blender':
-        resized_image_rgb = PILtoTorch(cam_info.image, resolution, resize_mode=Image.BILINEAR)
-        assert resized_image_rgb.shape[1] == 4
-        masks['original_mask'] = None
-        masks['original_acc_mask'] = resized_image_rgb[3:4, ...].clamp(0, 1).bool()
-    else:
-        if cam_info.mask is not None:
-            masks['original_mask'] = PILtoTorch(cam_info.mask, resolution, resize_mode=resize_mode).clamp(0, 1).bool()
-        # else:
-        #     masks['original_mask'] = None
-            
-        if cam_info.acc_mask is not None:
-            masks['original_acc_mask'] = PILtoTorch(cam_info.acc_mask, resolution, resize_mode=resize_mode).clamp(0, 1).bool()
-        # else:
-        #     masks['original_acc_mask'] = None
-                        
-        if 'sky_mask' in cam_info.metadata:
-            masks['original_sky_mask'] = PILtoTorch(cam_info.metadata['sky_mask'], resolution, resize_mode=resize_mode).clamp(0, 1).bool()
-            del cam_info.metadata['sky_mask']
-        # else:
-        #     masks['original_sky_mask'] = None    
-        
-        if 'obj_bound' in cam_info.metadata:
-            masks['original_obj_bound'] = PILtoTorch(cam_info.metadata['obj_bound'], resolution, resize_mode=resize_mode).clamp(0, 1).bool()
-            del cam_info.metadata['obj_bound']
-        
-    return masks
+def loadguidance(guidance, resolution):
+    new_guidance = dict()
+    for k, v in guidance.items():
+        if k == 'mask':
+            new_guidance['mask'] = PILtoTorch(v, resolution, resize_mode=Image.NEAREST).bool()
+        elif k == 'acc_mask':
+            new_guidance['acc_mask'] = PILtoTorch(v, resolution, resize_mode=Image.NEAREST).bool()
+        elif k == 'sky_mask':
+            new_guidance['sky_mask'] = PILtoTorch(v, resolution, resize_mode=Image.NEAREST).bool()
+        elif k == 'obj_bound':
+            new_guidance['obj_bound'] = PILtoTorch(v, resolution, resize_mode=Image.NEAREST).bool()
+        elif k == 'lidar_depth':
+            new_guidance['lidar_depth'] = NumpytoTorch(v, resolution, resize_mode=Image.NEAREST).float()
 
-def loadmetadata(metadata, resolution):
-    output = copy.deepcopy(metadata)
-
-    
-
-    # semantic
-    if 'semantic' in metadata:
-        output['semantic'] = NumpytoTorch(metadata['semantic'], resolution, resize_mode=Image.NEAREST)
-    
-    # lidar_depth
-    if 'lidar_depth' in metadata:
-        output['lidar_depth'] = NumpytoTorch(metadata['lidar_depth'], resolution, resize_mode=Image.NEAREST)
-    
-    # mono depth
-    if 'mono_depth' in metadata:
-        output['mono_depth'] = NumpytoTorch(metadata['mono_depth'], resolution, resize_mode=Image.NEAREST)
-        
-    # mono normal
-    if 'mono_normal' in metadata:
-        output['mono_normal'] = NumpytoTorch(metadata['mono_normal'], resolution, resize_mode=Image.NEAREST)
-    
-    return output
+    return new_guidance
         
 WARNED = False
-def loadCam(cam_info: CameraInfo, resolution_scale):
-    orig_w, orig_h = cam_info.image.size
-    if cfg.resolution in [1, 2, 4, 8]:
-        scale = resolution_scale * cfg.resolution
-        resolution = round(orig_w / scale), round(orig_h / scale)
-    else:  # should be a type that converts to float
-        if cfg.resolution == -1:
-            if orig_w > 1600:
-                global WARNED
-                if not WARNED:
-                    print("[ INFO ] Encountered quite large input images (>1.6K pixels width), rescaling to 1.6K.\n "
-                        "If this is not desired, please explicitly specify '--resolution/-r' as 1")
-                    WARNED = True
-                global_down = orig_w / 1600
-            else:
-                global_down = 1
-        else:
-            global_down = orig_w / cfg.resolution
-
-        scale = float(global_down) * float(resolution_scale)
-        resolution = (int(orig_w / scale), int(orig_h / scale))
+def loadCam(cam_info: CameraInfo, resolution_scale, scale=1.0):
+    orig_w = cam_info.width
+    orig_h = cam_info.height
+    scale = min(scale, 1600 / orig_w)
+    scale = scale / resolution_scale
+    resolution = (int(orig_w * scale), int(orig_h * scale))
 
     K = copy.deepcopy(cam_info.K)
-    K[:2] /= scale
+    K[:2] *= scale
 
     image = PILtoTorch(cam_info.image, resolution, resize_mode=Image.BILINEAR)[:3, ...]
-    masks = loadmask(cam_info, resolution, resize_mode=Image.NEAREST)
-    metadata = loadmetadata(cam_info.metadata, resolution)
-    
+    guidance = loadguidance(cam_info.guidance, resolution)
+
     return Camera(
-        id=cam_info.uid, 
-        R=cam_info.R, 
-        T=cam_info.T, 
-        FoVx=cam_info.FovX, 
-        FoVy=cam_info.FovY, 
+        id=cam_info.uid,
+        R=cam_info.R,
+        T=cam_info.T,
+        FoVx=cam_info.FovX,
+        FoVy=cam_info.FovY,
         K=K,
-        image=image, 
-        masks=masks,
-        image_name=cam_info.image_name, 
-        metadata=metadata,
+        image=image,
+        image_name=cam_info.image_name,
+        metadata=cam_info.metadata,
+        guidance=guidance,
     )
+
 
 def cameraList_from_camInfos(cam_infos, resolution_scale):
     camera_list = []

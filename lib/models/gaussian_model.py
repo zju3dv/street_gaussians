@@ -464,7 +464,7 @@ class GaussianModel(nn.Module):
             torch.max(self.get_scaling, dim=1).values > self.percent_dense * padded_extent)
 
         self.scalar_dict['points_split'] = selected_pts_mask.sum().item()
-        print(f'Number of points to split: {selected_pts_mask.sum()}')
+        # print(f'Number of points to split: {selected_pts_mask.sum()}')
 
         stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
         means = torch.zeros((stds.size(0), 3), device="cuda")
@@ -499,7 +499,7 @@ class GaussianModel(nn.Module):
             torch.max(self.get_scaling, dim=1).values <= self.percent_dense * scene_extent)
 
         self.scalar_dict['points_clone'] = selected_pts_mask.sum().item()
-        print(f'Number of points to clone: {selected_pts_mask.sum()}')
+        # print(f'Number of points to clone: {selected_pts_mask.sum()}')
         
         new_xyz = self._xyz[selected_pts_mask]
         new_features_dc = self._features_dc[selected_pts_mask]
@@ -525,7 +525,7 @@ class GaussianModel(nn.Module):
         
         self.scalar_dict.clear()
         self.scalar_dict['points_total'] = self.get_xyz.shape[0]
-        print(f'Number of current gaussians: {self.get_xyz.shape[0]}')
+        # print(f'Number of current gaussians: {self.get_xyz.shape[0]}')
 
         # Clone and Split        
         self.densify_and_clone(grads, max_grad, extent)
@@ -541,8 +541,7 @@ class GaussianModel(nn.Module):
 
         self.prune_points(prune_mask)
         self.scalar_dict['points_pruned'] = prune_mask.sum().item()            
-        print(f'Number of pruned gaussians: {prune_mask.sum()}')
-
+        # print(f'Number of pruned gaussians: {prune_mask.sum()}')
         
         self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 2), device="cuda")
         self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")

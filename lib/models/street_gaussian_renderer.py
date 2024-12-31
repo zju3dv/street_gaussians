@@ -46,11 +46,11 @@ class StreetGaussianRenderer():
         convert_SHs_python = None, 
         compute_cov3D_python = None, 
         scaling_modifier = None, 
-        override_color = None
+        override_color = None,
+        parse_camera_again: bool = True,
     ):        
         pc.set_visibility(include_list=pc.obj_list)
-        pc.parse_camera(viewpoint_camera)
-        
+        if parse_camera_again: pc.parse_camera(viewpoint_camera)        
         result = self.render_kernel(viewpoint_camera, pc, convert_SHs_python, compute_cov3D_python, scaling_modifier, override_color, white_background=True)
 
         return result
@@ -62,10 +62,11 @@ class StreetGaussianRenderer():
         convert_SHs_python = None, 
         compute_cov3D_python = None, 
         scaling_modifier = None, 
-        override_color = None
+        override_color = None,
+        parse_camera_again: bool = True,
     ):
         pc.set_visibility(include_list=['background'])
-        pc.parse_camera(viewpoint_camera)
+        if parse_camera_again: pc.parse_camera(viewpoint_camera)
         result = self.render_kernel(viewpoint_camera, pc, convert_SHs_python, compute_cov3D_python, scaling_modifier, override_color, white_background=True)
 
         return result
@@ -77,10 +78,11 @@ class StreetGaussianRenderer():
         convert_SHs_python = None, 
         compute_cov3D_python = None, 
         scaling_modifier = None, 
-        override_color = None
+        override_color = None,
+        parse_camera_again: bool = True,
     ):  
         pc.set_visibility(include_list=['sky'])
-        pc.parse_camera(viewpoint_camera)
+        if parse_camera_again: pc.parse_camera(viewpoint_camera)
         result = self.render_kernel(viewpoint_camera, pc, convert_SHs_python, compute_cov3D_python, scaling_modifier, override_color)
         return result
     
@@ -127,8 +129,13 @@ class StreetGaussianRenderer():
         override_color = None,
         white_background = cfg.data.white_background,
     ):
+        try:
+            means3D = pc.get_xyz
+            num_gaussians = len(means3D)
+        except:
+            num_gaussians = 0
         
-        if pc.num_gaussians == 0:
+        if num_gaussians == 0:
             if white_background:
                 rendered_color = torch.ones(3, int(viewpoint_camera.image_height), int(viewpoint_camera.image_width), device="cuda")
             else:
@@ -155,7 +162,7 @@ class StreetGaussianRenderer():
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
         # screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
         if cfg.mode == 'train':
-            screenspace_points = torch.zeros((pc.num_gaussians, 3), requires_grad=True).float().cuda() + 0
+            screenspace_points = torch.zeros((num_gaussians, 3), requires_grad=True).float().cuda() + 0
             try:
                 screenspace_points.retain_grad()
             except:
@@ -163,7 +170,6 @@ class StreetGaussianRenderer():
         else:
             screenspace_points = None 
 
-        means3D = pc.get_xyz
         means2D = screenspace_points
         opacity = pc.get_opacity
 

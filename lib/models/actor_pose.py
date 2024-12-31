@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from lib.utils.general_utils import quaternion_raw_multiply, get_expon_lr_func, quaternion_slerp, matrix_to_quaternion
+from lib.utils.general_utils import quaternion_raw_multiply, get_expon_lr_func, quaternion_slerp, quaternion_raw_multiply_theta
 from lib.config import cfg
 from lib.utils.camera_utils import Camera
 
@@ -78,7 +78,7 @@ class ActorPose(nn.Module):
     def update_optimizer(self):
         if self.opt_track:
             self.optimizer.step()
-            self.optimizer.zero_grad(set_to_none=None)
+            self.optimizer.zero_grad(set_to_none=True)
         
     def find_closest_indices(self, track_id, timestamp):
         track_idx = self.obj_info[track_id]['track_idx']
@@ -144,16 +144,10 @@ class ActorPose(nn.Module):
         if self.opt_track:
             rots1 = self.input_rots[frame_ind1, column_ind1]
             rots2 = self.input_rots[frame_ind2, column_ind2]
-            opt_rots1 = torch.zeros_like(rots1)
-            opt_rots2 = torch.zeros_like(rots2)
-            opt_rots1[0] = torch.cos(self.opt_rots[frame_ind1, column_ind1])
-            opt_rots1[3] = torch.sin(self.opt_rots[frame_ind1, column_ind1])
-            opt_rots2[0] = torch.cos(self.opt_rots[frame_ind2, column_ind2])
-            opt_rots2[3] = torch.sin(self.opt_rots[frame_ind2, column_ind2])            
-
-            rots1 = quaternion_raw_multiply(rots1.unsqueeze(0), opt_rots1.unsqueeze(0)).squeeze(0)
-            rots2 = quaternion_raw_multiply(rots2.unsqueeze(0), opt_rots2.unsqueeze(0)).squeeze(0)
-
+            theta1 = self.opt_rots[frame_ind1, column_ind1]
+            theta2 = self.opt_rots[frame_ind1, column_ind2]
+            rots1 = quaternion_raw_multiply_theta(rots1, theta1)
+            rots2 = quaternion_raw_multiply_theta(rots1, theta2)
         else:
             rots1 = self.input_rots[frame_ind1, column_ind1]
             rots2 = self.input_rots[frame_ind2, column_ind2]

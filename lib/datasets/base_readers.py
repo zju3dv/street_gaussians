@@ -16,9 +16,8 @@ class CameraInfo(NamedTuple):
     width: int
     height: int
     metadata: dict = dict()
-    mask: np.array = None
-    acc_mask: np.array = None
-            
+    guidance: dict = dict()
+
 class SceneInfo(NamedTuple):
     point_cloud: BasicPointCloud
     train_cameras: list

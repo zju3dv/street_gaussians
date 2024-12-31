@@ -237,6 +237,27 @@ def quaternion_raw_multiply(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     oz = aw * bz + ax * by - ay * bx + az * bw
     return torch.stack((ow, ox, oy, oz), -1)
 
+def quaternion_raw_multiply_theta(a: torch.Tensor, theta: torch.Tensor) -> torch.Tensor:
+    """
+    Multiply a quaternion by a rotation around the z-axis.
+    Usual torch rules for broadcasting apply.
+
+    Args:
+        a: Quaternions as tensor of shape (..., 4), real part first.
+        theta: Rotation angle in radians as tensor of shape (...).
+
+    Returns:
+        The product of a and the rotation, a tensor of quaternions shape (..., 4).
+    """
+    aw, ax, ay, az = torch.unbind(a, -1)
+    bw, bz = torch.cos(theta), torch.sin(theta)
+
+    ow = aw * bw - az * bz
+    ox = ax * bw + ay * bz
+    oy = ay * bw - ax * bz
+    oz = az * bw + aw * bz
+    return torch.stack((ow, ox, oy, oz), -1)
+
 def quaternion_invert(quaternion: torch.Tensor) -> torch.Tensor:
     """
     Given a quaternion representing rotation, get the quaternion representing
@@ -267,7 +288,13 @@ def quaternion_slerp(q0: torch.Tensor, q1: torch.Tensor, step=0.5) -> torch.Tens
     q0 = q0[..., [1, 2, 3, 0]]
     q1 = q1[..., [1, 2, 3, 0]]
     steps = torch.tensor([step], device=q1.device).float()
-    q = roma.utils.unitquat_slerp(q0, q1, steps) 
+    
+    from lib.config import cfg
+    if cfg.mode == 'train':
+        q = roma.utils.unitquat_slerp(q0, q1, steps)
+    else:
+        q = roma.utils.unitquat_slerp_fast(q0, q1, steps) 
+    
     q = q[..., [3, 0, 1, 2]].squeeze(0)
     
     if ndim == 1:

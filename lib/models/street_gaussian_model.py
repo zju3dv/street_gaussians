@@ -227,38 +227,29 @@ class StreetGaussianModel(nn.Module):
         self.frame_idx = camera.meta['frame_idx']
         self.frame_is_val = camera.meta['is_val']
         self.num_gaussians = 0
+        self.graph_gaussian_range = dict()
+        idx = 0
 
         # background        
         if self.get_visibility('background'):
             num_gaussians_bkgd = self.background.get_xyz.shape[0]
             self.num_gaussians += num_gaussians_bkgd
-
+            self.graph_gaussian_range['background'] = [idx, idx + num_gaussians_bkgd]
+            idx += num_gaussians_bkgd
+        
         # object (build scene graph)
         self.graph_obj_list = []
-
         if self.include_obj:
-            timestamp = camera.meta['timestamp']
             for i, obj_name in enumerate(self.obj_list):
                 obj_model: GaussianModelActor = getattr(self, obj_name)
-                start_timestamp, end_timestamp = obj_model.start_timestamp, obj_model.end_timestamp
-                if timestamp >= start_timestamp and timestamp <= end_timestamp and self.get_visibility(obj_name):
+                start_frame, end_frame = obj_model.start_frame, obj_model.end_frame
+                if self.frame >= start_frame and self.frame <= end_frame and self.get_visibility(obj_name):
                     self.graph_obj_list.append(obj_name)
                     num_gaussians_obj = getattr(self, obj_name).get_xyz.shape[0]
                     self.num_gaussians += num_gaussians_obj
+                    self.graph_gaussian_range[obj_name] = [idx, idx + num_gaussians_obj]
+                    idx += num_gaussians_obj
 
-        # set index range
-        self.graph_gaussian_range = dict()
-        idx = 0
-        
-        if self.get_visibility('background'):
-            num_gaussians_bkgd = self.background.get_xyz.shape[0]
-            self.graph_gaussian_range['background'] = [idx, idx+num_gaussians_bkgd-1]
-            idx += num_gaussians_bkgd
-        
-        for obj_name in self.graph_obj_list:
-            num_gaussians_obj = getattr(self, obj_name).get_xyz.shape[0]
-            self.graph_gaussian_range[obj_name] = [idx, idx+num_gaussians_obj-1]
-            idx += num_gaussians_obj
 
         if len(self.graph_obj_list) > 0:
             self.obj_rots = []
@@ -282,15 +273,16 @@ class StreetGaussianModel(nn.Module):
             self.obj_rots = torch.cat(self.obj_rots, dim=0)
             self.obj_trans = torch.cat(self.obj_trans, dim=0)  
             
-            self.flip_mask = []
-            for obj_name in self.graph_obj_list:
-                obj_model: GaussianModelActor = getattr(self, obj_name)
-                if obj_model.deformable or self.flip_prob == 0:
-                    flip_mask = torch.zeros_like(obj_model.get_xyz[:, 0]).bool()
-                else:
-                    flip_mask = torch.rand_like(obj_model.get_xyz[:, 0]) < self.flip_prob
-                self.flip_mask.append(flip_mask)
-            self.flip_mask = torch.cat(self.flip_mask, dim=0)   
+            if cfg.mode == 'train':
+                self.flip_mask = []
+                for obj_name in self.graph_obj_list:
+                    obj_model: GaussianModelActor = getattr(self, obj_name)
+                    if obj_model.deformable or self.flip_prob == 0:
+                        flip_mask = torch.zeros_like(obj_model.get_xyz[:, 0]).bool()
+                    else:
+                        flip_mask = torch.rand_like(obj_model.get_xyz[:, 0]) < self.flip_prob
+                    self.flip_mask.append(flip_mask)
+                self.flip_mask = torch.cat(self.flip_mask, dim=0)
             
     @property
     def get_scaling(self):
@@ -328,8 +320,11 @@ class StreetGaussianModel(nn.Module):
                 rotations_local.append(rotation_local)
 
             rotations_local = torch.cat(rotations_local, dim=0)
-            rotations_local = rotations_local.clone()
-            rotations_local[self.flip_mask] = quaternion_raw_multiply(self.flip_matrix, rotations_local[self.flip_mask])
+            if cfg.mode == 'train':
+                rotations_local = rotations_local.clone()
+                rotations_flip = rotations_local[self.flip_mask]
+                if len(rotations_flip) > 0:
+                    rotations_local[self.flip_mask] = quaternion_raw_multiply(self.flip_matrix, rotations_flip)
             rotations_obj = quaternion_raw_multiply(self.obj_rots, rotations_local)
             rotations_obj = torch.nn.functional.normalize(rotations_obj)
             rotations.append(rotations_obj)
@@ -356,8 +351,9 @@ class StreetGaussianModel(nn.Module):
                 xyzs_local.append(xyz_local)
                 
             xyzs_local = torch.cat(xyzs_local, dim=0)
-            xyzs_local = xyzs_local.clone()
-            xyzs_local[self.flip_mask, self.flip_axis] *= -1
+            if cfg.mode == 'train':
+                xyzs_local = xyzs_local.clone()
+                xyzs_local[self.flip_mask, self.flip_axis] *= -1
             obj_rots = quaternion_to_matrix(self.obj_rots)
             xyzs_obj = torch.einsum('bij, bj -> bi', obj_rots, xyzs_local) + self.obj_trans
             xyzs.append(xyzs_obj)
@@ -558,7 +554,6 @@ class StreetGaussianModel(nn.Module):
         for model_name in self.graph_gaussian_range.keys():
             model: GaussianModel = getattr(self, model_name)
             start, end = self.graph_gaussian_range[model_name]
-            end += 1
             visibility_model = visibility_filter[start:end]
             max_radii2D_model = radii[start:end]
             model.max_radii2D[visibility_model] = torch.max(
@@ -566,11 +561,9 @@ class StreetGaussianModel(nn.Module):
         
     def add_densification_stats(self, viewspace_point_tensor, visibility_filter):
         viewspace_point_tensor_grad = viewspace_point_tensor.grad
-
         for model_name in self.graph_gaussian_range.keys():
             model: GaussianModel = getattr(self, model_name)
             start, end = self.graph_gaussian_range[model_name]
-            end += 1
             visibility_model = visibility_filter[start:end]
             viewspace_point_tensor_grad_model = viewspace_point_tensor_grad[start:end]
             model.xyz_gradient_accum[visibility_model, 0:1] += torch.norm(viewspace_point_tensor_grad_model[visibility_model, :2], dim=-1, keepdim=True)
