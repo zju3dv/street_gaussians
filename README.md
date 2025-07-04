@@ -80,10 +80,12 @@ python script/waymo/generate_sky_mask.py --datadir DATA_DIR --sam_checkpoint SAM
 <details> <summary>Prepare Custom Dataset.</summary>
 TODO
 </details>
-<!-- 
+
 ### Configuration
 We build the configuration based on [3D Gaussian Splatting](https://github.com/graphdeco-inria/gaussian-splatting/blob/main/arguments/__init__.py). 
-The parameters used are listed in `lib/config/config.py` with brief comments. -->
+The parameters used are listed in `config.py` as shown [here](https://github.com/zju3dv/street_gaussians/blob/main/lib/config/config.py) with brief comments. 
+- For monocular video reconstruction as demonstrated in the paper, it is recommended to use configuration provided in the [experiments](https://github.com/zju3dv/street_gaussians/tree/main/configs/experiments_waymo) directory.
+- For reconstruction of general sequences, it is recommenned to use `default.yaml` as shown [here](https://github.com/zju3dv/street_gaussians/blob/main/configs/default.yaml). You may need to adjust certain parameters to suit your specific sequences.
 
 ### Training
 ```
