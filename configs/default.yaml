@@ -1,0 +1,83 @@
+task: ???
+source_path: ???
+exp_name: ???
+to_cuda: true # move training cameras to GPU 
+
+data:
+  split_test: -1
+  split_train: 1
+  type: ???
+  white_background: false
+  selected_frames: ???
+  cameras: ???
+  extent: 10 # the unit here is meter
+  use_colmap: true
+  filter_colmap: true
+  box_scale: 1.5
+
+model:
+  gaussian:
+    sh_degree: 1
+    fourier_dim: 5
+    fourier_scale: 1.
+    flip_prob: 0.2
+  nsg:
+    include_bkgd: true
+    include_obj: true
+    include_sky: true
+    opt_track: true
+  sky:
+    resolution: 1024
+    white_background: ???  # set the default color based on the current time of day
+
+train:
+  iterations: 30000
+  test_iterations: [7000, 30000]
+  save_iterations: [30000]
+  checkpoint_iterations: [30000]
+
+optim:
+  prune_box_interval: 100
+  densification_interval: 100
+  densify_from_iter: 500
+  densify_grad_threshold_bkgd: 0.0006
+  densify_grad_abs_bkgd: True
+  densify_grad_threshold_obj: 0.0002
+  densify_grad_abs_obj: False
+  densify_grad_threshold: 0.0002
+  densify_until_iter: 25000
+  feature_lr: 0.0025
+  max_screen_size: 20
+  min_opacity: 0.005
+  opacity_lr: 0.05
+  opacity_reset_interval: 3000
+  percent_big_ws: 0.1
+  percent_dense: 0.01
+  position_lr_delay_mult: 0.01
+  position_lr_final: 1.6e-06
+  position_lr_init: 0.00016
+  position_lr_max_steps: 50000
+  rotation_lr: 0.001
+  scaling_lr: 0.005
+  semantic_lr: 0.01
+
+  lambda_dssim: 0.2
+  lambda_sky: 0.05
+  lambda_sky_scale: ??? # the sky mask is sometimes inaccurate, you can set the loss scale for each camera
+  lambda_mask: 0.1
+  lambda_reg: 0.1
+  lambda_depth_lidar: 0.1
+
+  track_position_lr_delay_mult: 0.2
+  track_position_lr_init: 0.0005
+  track_position_lr_final: 0.0001
+  track_position_max_steps: 30000
+
+  track_rotation_lr_delay_mult: 0.5
+  track_rotation_lr_init: 0.00001
+  track_rotation_lr_final: 0.000005
+  track_rotation_max_steps: 30000
+
+render:
+  fps: 24
+  concat_cameras: [1, 0, 2]
